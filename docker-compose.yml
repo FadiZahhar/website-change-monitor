@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web-monitor:
+    container_name: website-monitor
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src   # Mount local code to the container for development
+      - ./storage:/app/storage  # Store screenshots outside the container
+    restart: unless-stopped
