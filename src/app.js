@@ -16,9 +16,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/monitor-sse', async (req, res) => {
   const rootUrl = req.query.rootUrl;
+  const crawlMode = req.query.crawlMode; // "single" or "full"
 
-  if (!rootUrl) {
-    return res.status(400).send('Root URL is required.');
+  if (!rootUrl || !crawlMode) {
+    return res.status(400).send('Root URL and crawl mode are required.');
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -28,11 +29,16 @@ app.get('/monitor-sse', async (req, res) => {
   const sendEvent = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
   try {
-    sendEvent('message', { message: `Starting crawl for ${rootUrl}...` });
-    console.log(`Starting crawl for ${rootUrl}...`);
+    sendEvent('message', { message: `Starting ${crawlMode === 'full' ? 'full site crawl' : 'single URL monitoring'} for ${rootUrl}...` });
+    console.log(`Starting ${crawlMode} crawl for ${rootUrl}...`);
 
-    const urls = await crawlWebsite(rootUrl, (log) => sendEvent('log', { message: log }));
-    sendEvent('message', { message: `Crawled ${urls.length} URLs.` });
+    let urls = [rootUrl]; // Default for single URL
+    const currentHost = `${req.protocol}://${req.get('host')}`; // Dynamically detect the current host
+    // If full site mode, crawl all internal links
+    if (crawlMode === 'full') {
+      urls = await crawlWebsite(rootUrl, (log) => sendEvent('log', { message: log }));
+      sendEvent('message', { message: `Crawled ${urls.length} URLs.` });
+    }
 
     const reportDetails = [];
     const totalUrls = urls.length;
@@ -83,9 +89,8 @@ app.get('/monitor-sse', async (req, res) => {
       }
     }
 
-    // Construct the final report
     const report = {
-      summary: `Processed ${urls.length} URLs for ${rootUrl}.`,
+      summary: `Processed ${urls.length} URL(s) for ${rootUrl}.`,
       details: reportDetails,
     };
 
@@ -93,8 +98,10 @@ app.get('/monitor-sse', async (req, res) => {
     const subject = 'Website Monitoring Report';
     const text = `Website Monitoring Report\n\nSummary: ${report.summary}\n\nDetails:\n` +
       report.details
-        .map((item) => `${item.url}\nStatus: ${item.status}${item.diffImage ? `\nDiff Image: ${item.diffImage}` : ''}`)
+        .map((item) => `${item.url}\nStatus: ${item.status}${item.diffImage ? `\nDiff Image: ${currentHost}${item.diffImage}` : ''}`)
         .join('\n\n');
+
+    
 
     const html = `
       <h2>Website Monitoring Report</h2>
@@ -108,7 +115,7 @@ app.get('/monitor-sse', async (req, res) => {
                 <strong>Status:</strong> ${item.status}<br>
                 ${
                   item.diffImage
-                    ? `<strong>Diff Image:</strong> <a href="${item.diffImage}" target="_blank">View Image</a>`
+                    ? `<strong>Diff Image:</strong> <a href="${currentHost}${item.diffImage}" target="_blank">View Image</a>`
                     : ''
                 }
               </li>
@@ -118,7 +125,7 @@ app.get('/monitor-sse', async (req, res) => {
       </ul>
     `;
 
-    await sendEmailReport(subject, report);
+    //await sendEmailReport(subject, report);
     sendEvent('complete', { message: 'Monitoring Complete.', report });
     res.end();
   } catch (error) {

@@ -21,6 +21,13 @@
         <label for="rootUrl" class="form-label">Enter Website URL</label>
         <input type="url" id="rootUrl" class="form-control" placeholder="https://example.com" required />
       </div>
+      <div class="mb-3">
+        <label for="crawlMode" class="form-label">Crawl Mode</label>
+        <select id="crawlMode" class="form-select" required>
+          <option value="single">Single URL</option>
+          <option value="full">Full Site</option>
+        </select>
+      </div>
       <button type="submit" class="btn btn-primary">Start Monitoring</button>
     </form>
 
@@ -44,13 +51,14 @@
       e.preventDefault();
 
       const rootUrl = document.getElementById('rootUrl').value;
+      const crawlMode = document.getElementById('crawlMode').value;
 
       logContainer.innerHTML = ''; // Clear logs
       progressBar.style.width = '0%'; // Reset progress
       progressBar.textContent = '0%';
       progressSection.classList.remove('d-none');
 
-      const eventSource = new EventSource(`/monitor-sse?rootUrl=${encodeURIComponent(rootUrl)}`);
+      const eventSource = new EventSource(`/monitor-sse?rootUrl=${encodeURIComponent(rootUrl)}&crawlMode=${crawlMode}`);
 
       eventSource.addEventListener('message', (event) => {
         const data = JSON.parse(event.data);
