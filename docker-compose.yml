@@ -9,6 +9,9 @@ services:
     env_file:
       - .env
     volumes:
-      - ./src:/app/src   # Mount local code to the container for development
-      - ./storage:/app/storage  # Store screenshots outside the container
+      - ./src:/app/src           # Keep bind mount for development
+      - website-storage:/app/src/storage  # Use a named volume for storage
     restart: unless-stopped
+
+volumes:
+  website-storage:  # Define the named volume
